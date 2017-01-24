@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
+#define ARG_MAX 100 /* Max char length in sh is actually 2097152. Reduced
+                        to reduce impact */
+
 int getcmd(char *prompt, char *args[], int *background) {
     int length, i = 0;
     char *token, *loc;
@@ -55,6 +58,8 @@ int execute(char *args[], int bg) {
     }
 }
 
+
+
 int main(void) {
     
     char *args[20];
@@ -62,7 +67,24 @@ int main(void) {
 
     while(1) {
         bg = 0;
-        int cnt = getcmd("\n>> ", args, &bg);  
+        int cnt = getcmd("\njsh >> ", args, &bg);
+        if(strcmp(args[0], "pwd") == 0) {
+            char path[ARG_MAX];
+            if(getcwd(path, ARG_MAX) != NULL) {
+                printf("%s", path);
+                continue;
+            } 
+        } else if(strcmp(args[0], "cd") == 0) {
+            chdir(args[1]);
+            continue;
+        } else if(strcmp(args[0], "exit") == 0) {
+            exit(0);
+        } else if(strcmp(args[0], "fg") == 0) {
+            pid_t pid = jobs[atoi(args[1]) + 1].pid; //TODO : maintain jobs ds
+            waitpid(pid, NULL, 0); /* bring to the front */
+        } else if(strcmp(args[0], "jobs") == 0) {
+           listJobs(); //TODO : implement helper func to list jobs
+        }
         execute(args, bg);
     }
 }
