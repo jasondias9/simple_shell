@@ -23,10 +23,9 @@ int getcmd(char *prompt, char *args[], int *background, char *line) {
     int length, i = 0;
     char *token, *loc;
     size_t linecap = 0;
-
+    
     printf("%s", prompt);
-    length = getline(&line, &linecap, stdin);
-
+    length = getline(&line, &linecap, stdin); 
     if(length <= 0) {
         exit(-1);
     }
@@ -38,16 +37,20 @@ int getcmd(char *prompt, char *args[], int *background, char *line) {
         *background = 0;
     }
 
-    while ((token = strsep(&line, " \t\n")) != NULL) {
+    token = strtok(line, " \n\t");
+
+    while(token != NULL) {
         for(int j = 0; j < strlen(token); j++) {
-            if(token[j] <= 32) {
-                token[j] = '\0';
-            }
-            if(strlen(token) > 0) {
-                args[i++] = token;
-            }
+            if(token[j] <= 32) token[j] = '\0';
         }
-    }    
+        if(strlen(token) > 0) {
+            args[i++] = token;
+        }
+        
+        token = strtok(NULL, " \t\n"); 
+    }
+    free(token);
+    free(loc);
     return i;
 }
 
@@ -70,6 +73,8 @@ int execute(char *line, char *args[], int bg) {
         jobs[BG_COUNT].pid = pid;
         strcpy(jobs[BG_COUNT].cmd, line);
     }
+
+    return 0;
 }
 
 int listjobs() {
@@ -79,18 +84,18 @@ int listjobs() {
 int main(void) {
     
     char *args[20];
-    char *line;
+    char *line = NULL;
     int bg;
 
     while(1) {
         bg = 0;
-        int cnt = getcmd("\njsh >> ", args, &bg, line);
+        int cnt = getcmd("\njsh>> ", args, &bg, line);
         if(strcmp(args[0], "pwd") == 0) {
             char path[ARG_MAX];
             if(getcwd(path, ARG_MAX) != NULL) {
                 printf("%s", path);
                 continue;
-            } 
+            }
         } else if(strcmp(args[0], "cd") == 0) {
             chdir(args[1]);
             continue;
@@ -101,7 +106,9 @@ int main(void) {
             waitpid(pid, NULL, 0);
         } else if(strcmp(args[0], "jobs") == 0) {
            listjobs(); //TODO : implement helper func to list jobs
+        } else {
+            execute(line, args, bg);
         }
-        execute(line, args, bg);
+
     }
 }
