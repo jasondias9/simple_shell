@@ -7,7 +7,7 @@
 #define ARG_MAX 100 /* Max char length in sh is actually 2097152. Reduced
                         to reduced here for simplification */
 #define MAX_BG 10 
-
+#define PROMPT "jsh>> "
 int BG_COUNT = 0;
 
 
@@ -19,12 +19,13 @@ typedef struct job {
 
 struct job jobs[MAX_BG];
 
-int getcmd(char *prompt, char *args[], int *background, char *line) {
+
+int getcmd(char *args[], int *background, char *line) {
     int length, i = 0;
     char *token, *loc;
     size_t linecap = 0;
     
-    printf("%s", prompt);
+    printf("%s", PROMPT);
     length = getline(&line, &linecap, stdin); 
     if(length <= 0) {
         exit(-1);
@@ -37,7 +38,7 @@ int getcmd(char *prompt, char *args[], int *background, char *line) {
         *background = 0;
     }
 
-    token = strtok(line, " \n\t");
+    token = strtok(line, " \t\n");
 
     while(token != NULL) {
         for(int j = 0; j < strlen(token); j++) {
@@ -49,8 +50,8 @@ int getcmd(char *prompt, char *args[], int *background, char *line) {
         
         token = strtok(NULL, " \t\n"); 
     }
-    free(token);
-    free(loc);
+    
+
     return i;
 }
 
@@ -69,9 +70,8 @@ int execute(char *line, char *args[], int bg) {
     if(!bg) {
         while(wait(&status) != pid);
     } else {
-        printf("[%i]  + %i", BG_COUNT + 1, (int)pid);    
-        jobs[BG_COUNT].pid = pid;
-        strcpy(jobs[BG_COUNT].cmd, line);
+
+
     }
 
     return 0;
@@ -84,16 +84,23 @@ int listjobs() {
 int main(void) {
     
     char *args[20];
-    char *line = NULL;
+    char line[ARG_MAX];
     int bg;
 
     while(1) {
         bg = 0;
-        int cnt = getcmd("\njsh>> ", args, &bg, line);
+        fflush(stdout);
+        memset(args, 0, ARG_MAX);
+        memset(line, 0, ARG_MAX);
+
+        int cnt = getcmd(args, &bg, line);
+        fflush(stdout);
+
+
         if(strcmp(args[0], "pwd") == 0) {
             char path[ARG_MAX];
             if(getcwd(path, ARG_MAX) != NULL) {
-                printf("%s", path);
+                printf("%s\n", path);
                 continue;
             }
         } else if(strcmp(args[0], "cd") == 0) {
@@ -109,6 +116,7 @@ int main(void) {
         } else {
             execute(line, args, bg);
         }
+
 
     }
 }
