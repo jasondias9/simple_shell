@@ -4,25 +4,32 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-#define ARG_MAX 100 /* Max char length in sh is actually 2097152. Reduced
-                        to 100 here for simplification */
-#define MAX_BG 10 
+#define ARG_MAX 1024
+#define MAX_JOBS 10 
 #define PROMPT "jsh>> "
+
 
 int BG_COUNT = 0;
 
 typedef struct job {
-    char status[ARG_MAX];
-    int job_id;
+    int jid;
     pid_t pid;
+    int state;
     char cmd[ARG_MAX];
 
 } job;
 
-struct job jobs[MAX_BG];
+struct job jobs[MAX_JOBS];
+
+/* Prototypes */
+int get_cmd(char *args[], int *background, int length, char *line);
+int execute(char *args[], int bg, char *line);
+int list_jobs();
+int merge_cmd(char **cmd, char *args[], int size);
 
 
-int getcmd(char *args[], int *background, int length, char *line) {
+
+int get_cmd(char *args[], int *background, int length, char *line) {
     int i = 0;
     char *token, *loc;
 
@@ -59,7 +66,7 @@ int execute(char *args[], int bg, char *line) {
         exit(1);
     } else if(pid == 0) {
         if(execvp(args[0], args) < 0) { 
-            printf("jsh: command not found :  %s\n", args[0]);
+            printf("jsh: command not found :  %s\n", args[0]); //assumumption
             exit(1);
         } 
     }
@@ -68,23 +75,34 @@ int execute(char *args[], int bg, char *line) {
     } else {
        struct job n_job;
        n_job.pid = pid;
-       strcpy(n_job.status, "running");
        strcpy(n_job.cmd, line);
-       n_job.job_id = BG_COUNT;
-       jobs[BG_COUNT++] = n_job;
-       printf("[%i]   %d\n",BG_COUNT, (int)pid);
+       n_job.jid = BG_COUNT+1;
+       jobs[BG_COUNT] = n_job;
+       BG_COUNT++;
+       printf("[%i]   %i\n",BG_COUNT, (int)pid);
     }
 
     return 0;
 }
 
-int listjobs() {
+int list_jobs() {
     int i;
     for(i = 0; i < BG_COUNT; i++) {
-        printf("[%i]  +  %s     %s\n", jobs[i].job_id, jobs[i].status, jobs[i].cmd);
+        printf("[%i]  +  %s\n", jobs[i].jid, jobs[i].cmd);
     } 
-
 }
+
+int merge_cmd(char **cmd, char *args[], int size) {
+    int i;
+    for(i = 0; i < size; i++){
+        strcat(*cmd, args[i]);
+        strcat(*cmd, " ");
+    }
+    return 0;
+}
+
+
+/*Main Routine*/
 
 int main(void) {
     
@@ -102,7 +120,9 @@ int main(void) {
 
         printf("%s", PROMPT);
         length = getline(&line, &linecap, stdin);
-        int cnt = getcmd(args, &bg, length, line);
+        int cnt = get_cmd(args, &bg, length, line);
+        char *cmd = malloc(length);
+        merge_cmd(&cmd, args, cnt);
         fflush(stdout);
         
         if(strcmp(args[0], "pwd") == 0) {
@@ -120,9 +140,10 @@ int main(void) {
             pid_t pid = jobs[atoi(args[1]) + 1].pid;
             waitpid(pid, NULL, 0);
         } else if(strcmp(args[0], "jobs") == 0) { 
-           listjobs();
+           list_jobs();
         } else {
-            execute(args, bg, line);
+            execute(args, bg, cmd);
+            free(cmd);
         }
     }
 }
