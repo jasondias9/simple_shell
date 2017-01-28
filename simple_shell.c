@@ -59,19 +59,18 @@ int execute(char *line, char *args[], int bg) {
     pid_t pid = fork();
     int status;
     if(pid < 0) {
-        printf("**** ERROR: fork failed");
+        printf("**** ERROR: fork failed\n");
         exit(1);
     } else if(pid == 0) {
         if(execvp(args[0], args) < 0) {
-            printf("**** ERROR: execution of %s failed", args[0]);
+            printf("jsh: command not found :  %s\n", args[0]);
             exit(1);
         } 
     }
     if(!bg) {
         while(wait(&status) != pid);
     } else {
-
-
+        
     }
 
     return 0;
