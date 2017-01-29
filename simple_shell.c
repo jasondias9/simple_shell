@@ -6,7 +6,7 @@
 
 #define ARG_MAX 1024
 #define MAX_JOBS 10 
-#define PROMPT "jsh>> "
+#define PROMPT "[jsh]>> "
 
 
 int BG_COUNT = 0;
@@ -28,7 +28,7 @@ int list_jobs();
 int merge_cmd(char **cmd, char *args[], int size);
 
 
-
+/* Parse and tokenize input from user */
 int get_cmd(char *args[], int *background, int length, char *line) {
     int i = 0;
     char *token, *loc;
@@ -58,6 +58,7 @@ int get_cmd(char *args[], int *background, int length, char *line) {
     return i;
 }
 
+/* Execute the cmd and arguments */
 int execute(char *args[], int bg, char *line) {
     pid_t pid = fork();
     int status;
@@ -79,12 +80,13 @@ int execute(char *args[], int bg, char *line) {
        n_job.jid = BG_COUNT+1;
        jobs[BG_COUNT] = n_job;
        BG_COUNT++;
-       printf("[%i]   %i\n",BG_COUNT, (int)pid);
     }
 
     return 0;
 }
 
+
+/* List background jobs */
 int list_jobs() {
     int i;
     for(i = 0; i < BG_COUNT; i++) {
@@ -92,6 +94,7 @@ int list_jobs() {
     } 
 }
 
+/* Generate actual command input from user without '&' */
 int merge_cmd(char **cmd, char *args[], int size) {
     int i;
     for(i = 0; i < size; i++){
@@ -111,18 +114,17 @@ int main(void) {
 
     while(1) {
         bg = 0;
-        fflush(stdout);
+        fflush(stdout); 
         memset(&args, 0, ARG_MAX);
-        
         char *line;
         size_t linecap = 0;
         int length = 0;
-
         printf("%s", PROMPT);
         length = getline(&line, &linecap, stdin);
         int cnt = get_cmd(args, &bg, length, line);
         char *cmd = malloc(length);
         merge_cmd(&cmd, args, cnt);
+
         fflush(stdout);
         
         if(strcmp(args[0], "pwd") == 0) {
@@ -144,6 +146,7 @@ int main(void) {
         } else {
             execute(args, bg, cmd);
             free(cmd);
+            free(line);
         }
     }
 }
