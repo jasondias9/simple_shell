@@ -71,8 +71,6 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
         
         token = strtok(NULL, " \t\n"); 
     }
-    free(token);
-    free(loc);
     return i;
 }
 
@@ -171,7 +169,6 @@ int main(void) {
         } else {
             execute(args, bg, cmd);
             free(cmd);
-            free(line);
         }
     }
 }
