@@ -15,7 +15,9 @@ Simple Shell
 
 ## Installation
 
-```git clone git@github.com:jasondias9/simple_shell.git
+```shell
+git clone git@github.com:jasondias9/simple_shell.git
 cd simple_shell
 make
-./simple_shell```
+./simple_shell
+```
