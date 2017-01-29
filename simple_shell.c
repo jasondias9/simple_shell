@@ -22,14 +22,15 @@ typedef struct job {
 struct job jobs[MAX_JOBS];
 
 /* Prototypes */
-int get_cmd(char *args[], int *background, int length, char *line);
+int get_cmd(char *args[], int *background, int *out, int *pip, int length, char *line);
 int execute(char *args[], int bg, char *line);
 int list_jobs();
 int merge_cmd(char **cmd, char *args[], int size);
 
 
 /* Parse and tokenize input from user */
-int get_cmd(char *args[], int *background, int length, char *line) {
+int get_cmd(char *args[], int *background, int *out, int *pip, int length, char *line) {
+    fflush(stdout);
     int i = 0;
     char *token, *loc;
 
@@ -43,6 +44,21 @@ int get_cmd(char *args[], int *background, int length, char *line) {
     } else {
         *background = 0;
     }
+    
+    if((loc = index(line, '>')) != NULL) {
+        *out = 1;
+        *loc = ' ';
+    } else {
+        *out = 0;
+    }
+
+    if((loc = index(line, '|')) != NULL) {
+        *pip = 1;
+        *loc = ' ';
+    } else {
+        *pip = 0;
+    }
+
     token = strtok(line, " \t\n");
 
     while(token != NULL) {
@@ -55,6 +71,8 @@ int get_cmd(char *args[], int *background, int length, char *line) {
         
         token = strtok(NULL, " \t\n"); 
     }
+    free(token);
+    free(loc);
     return i;
 }
 
@@ -111,22 +129,29 @@ int main(void) {
     
     char *args[20];
     int bg;
+    int out;
+    int pip;
 
     while(1) {
         bg = 0;
+        out = 0;
+        pip = 0;
         fflush(stdout); 
         memset(&args, 0, ARG_MAX);
+
         char *line;
         size_t linecap = 0;
         int length = 0;
+
         printf("%s", PROMPT);
         length = getline(&line, &linecap, stdin);
-        int cnt = get_cmd(args, &bg, length, line);
+        int cnt = get_cmd(args, &bg, &out, &pip, length, line);
+        fflush(stdout);
+
         char *cmd = malloc(length);
         merge_cmd(&cmd, args, cnt);
-
-        fflush(stdout);
         
+        /* Some built-in functions  */
         if(strcmp(args[0], "pwd") == 0) {
             char path[ARG_MAX];
             if(getcwd(path, ARG_MAX) != NULL) {
