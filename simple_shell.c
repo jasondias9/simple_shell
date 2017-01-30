@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define ARG_MAX 1024
 #define MAX_JOBS 10 
@@ -21,9 +22,9 @@ typedef struct job {
 
 struct job jobs[MAX_JOBS];
 
-/* Prototypes */
+/* Function Prototypes */
 int get_cmd(char *args[], int *background, int *out, int *pip, int length, char *line);
-int execute(char *args[], int bg, char *line);
+int execute(char *args[], int cnt, int bg, int out, int pip, char *line);
 int list_jobs();
 int merge_cmd(char **cmd, char *args[], int size);
 
@@ -46,17 +47,18 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
     }
     
     if((loc = index(line, '>')) != NULL) {
-        *out = 1;
         *loc = ' ';
+        *out = 1;
     } else {
-        *out = 0;
+        out = 0;
     }
 
     if((loc = index(line, '|')) != NULL) {
-        *pip = 1;
         *loc = ' ';
+        *pip = 1;
+
     } else {
-        *pip = 0;
+        pip = 0;
     }
 
     token = strtok(line, " \t\n");
@@ -67,25 +69,35 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
         }
         if(strlen(token) > 0) {
             args[i++] = token;
-        }
-        
+        } 
         token = strtok(NULL, " \t\n"); 
     }
     return i;
 }
 
 /* Execute the cmd and arguments */
-int execute(char *args[], int bg, char *line) {
+int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
     pid_t pid = fork();
     int status;
     if(pid < 0) {
         printf("**** ERROR: fork failed\n");
         exit(1);
     } else if(pid == 0) {
+        if(out) {
+            close(fileno(stdout));
+            int fd1;
+            fd1 = open(args[cnt-1], O_RDWR|O_CREAT, 0777);
+            printf("%s", args[cnt-1]);
+            args[cnt-1] = 0; 
+        } else if(pip) {
+                    
+        } 
+        
         if(execvp(args[0], args) < 0) { 
-            printf("jsh: command not found :  %s\n", args[0]); //assumumption
+            printf("jsh: command not found :  %s\n", args[0]);//assumumption
             exit(1);
         } 
+        fflush(stdout);
     }
     if(!bg) {
         while(wait(&status) != pid);
@@ -140,14 +152,15 @@ int main(void) {
         char *line;
         size_t linecap = 0;
         int length = 0;
-
         printf("%s", PROMPT);
         length = getline(&line, &linecap, stdin);
         int cnt = get_cmd(args, &bg, &out, &pip, length, line);
         fflush(stdout);
-
-        char *cmd = malloc(length);
-        merge_cmd(&cmd, args, cnt);
+        char *cmd;
+        if(bg) {
+            cmd = malloc(length);
+            merge_cmd(&cmd, args, cnt);
+        }
         
         /* Some built-in functions  */
         if(strcmp(args[0], "pwd") == 0) {
@@ -167,8 +180,11 @@ int main(void) {
         } else if(strcmp(args[0], "jobs") == 0) { 
            list_jobs();
         } else {
-            execute(args, bg, cmd);
-            free(cmd);
+            execute(args, cnt, bg, out, pip, cmd);
+            if(bg) {
+                free(cmd);
+            } 
+            free(line);
         }
     }
 }
