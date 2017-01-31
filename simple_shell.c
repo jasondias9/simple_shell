@@ -32,7 +32,7 @@ int merge_cmd(char **cmd, char *args[], int size);
 /* Parse and tokenize input from user */
 int get_cmd(char *args[], int *background, int *out, int *pip, int length, char *line) {
     fflush(stdout);
-    int i = 0;
+    int pip_i, i = 0;
     char *token, *loc;
 
     if(length <= 0) {
@@ -52,27 +52,42 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
     } else {
         out = 0;
     }
-
+ 
     if((loc = index(line, '|')) != NULL) {
-        *loc = ' ';
         *pip = 1;
-
     } else {
         pip = 0;
     }
-
     token = strtok(line, " \t\n");
-
     while(token != NULL) {
-        for(int j = 0; j < strlen(token); j++) {
-            if(token[j] <= 32) token[j] = '\0';
+        for(int j = 0; j < strlen(token); j++) { 
+            if(token[j] <= 32) token[j] = '\0'; 
+            if(token[j] == 124) {
+                token[j] = '\0';
+                pip_i = i;
+            }
         }
+
         if(strlen(token) > 0) {
             args[i++] = token;
-        } 
+        }
         token = strtok(NULL, " \t\n"); 
     }
+    if(pip) {
+        i = pip_i; 
+    }
     return i;
+}
+
+int slice_array(char *args[], char *args_c[], int start, int end) {
+    int i;
+    for(i = 0; i+start < end; i++) {
+        args_c[i] = args[i+start];
+        if(i+1 == end) {
+            args_c[i+1] = NULL;
+        }
+    } 
+    args_c[i+1] = NULL;
 }
 
 /* Execute the cmd and arguments */
@@ -87,10 +102,31 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
             close(fileno(stdout));
             int fd1;
             fd1 = open(args[cnt-1], O_RDWR|O_CREAT, 0777);
-            printf("%s", args[cnt-1]);
             args[cnt-1] = 0; 
         } else if(pip) {
-                    
+            int pipefd[2];
+            if(pipe(pipefd) == -1) {
+                perror("piping error");
+            }
+            pid_t pid = fork();
+            if(pid == 0) {
+                char *args1[20];
+                slice_array(args, args1, 0, cnt);
+                close(pipefd[0]);
+                dup2(pipefd[1], fileno(stdout));
+                close(pipefd[1]);
+                execvp(args1[0], args1);
+                perror("exec error: ");
+                exit(1);
+            }
+            char *args2[20];
+            slice_array(args, args2, cnt, 19);
+            close(pipefd[1]);
+            dup2(pipefd[0], fileno(stdin));
+            close(pipefd[0]);
+            execvp(args2[0], args2);
+            perror("exec error: ");
+            exit(1);
         } 
         
         if(execvp(args[0], args) < 0) { 
@@ -99,6 +135,7 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
         } 
         fflush(stdout);
     }
+
     if(!bg) {
         while(wait(&status) != pid);
     } else {
@@ -153,6 +190,9 @@ int main(void) {
         size_t linecap = 0;
         int length = 0;
         printf("%s", PROMPT);
+        
+
+
         length = getline(&line, &linecap, stdin);
         int cnt = get_cmd(args, &bg, &out, &pip, length, line);
         fflush(stdout);
@@ -162,7 +202,7 @@ int main(void) {
             merge_cmd(&cmd, args, cnt);
         }
         
-        /* Some built-in functions  */
+        /* Some built-in functions TODO: Do these need to be forked? / Ability to be redirected/piped? */
         if(strcmp(args[0], "pwd") == 0) {
             char path[ARG_MAX];
             if(getcwd(path, ARG_MAX) != NULL) {
