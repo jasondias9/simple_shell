@@ -26,6 +26,9 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
 int execute(char *args[], int cnt, int bg, int out, int pip, char *line);
 int list_jobs();
 int merge_cmd(char **cmd, char *args[], int size);
+int slice_array(char *args[], char *args_c[], int start, int end);
+int execute_pipe(char *args[], int cnt);
+int check_exec_built_in(char *args[]);
 
 
 /* Parse and tokenize input from user */
@@ -159,7 +162,9 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
 int list_jobs() {
     int i;
     for(i = 0; i < BG_COUNT; i++) {
-        printf("[%i]   %s  %s\n", jobs[i].jid, jobs[i].state, jobs[i].cmd);
+        if(jobs[i].pid != 0) {
+            printf("[%i]   %s  %s\n", jobs[i].jid, jobs[i].state, jobs[i].cmd);
+        }
     } 
 }
 
@@ -193,7 +198,37 @@ int check_exec_built_in(char *args[]) {
     } else if(strcmp(args[0], "jobs") == 0) { 
         list_jobs();
         return 1;
-    } 
+    }
+    return 0;
+}
+
+int prep_jobs() {
+    for(int i = 0; i < 10; i++) {
+        struct job n_job;
+        n_job.pid = 0;
+        jobs[i] = n_job;
+    }
+
+}
+
+
+int handle_completed_bg_job() {
+    for(int j = 0; j < MAX_JOBS; j++) {
+        if(jobs[j].pid != 0) {
+            int status;
+            pid_t pid =  waitpid(jobs[j].pid, &status, WNOHANG);
+            if(pid < 0) {
+              //empty list, no such process 
+            } else if(pid == 0) {
+                //do nothing, proc still running
+                
+            } else if(pid = jobs[j].pid) {
+                struct job n_job;
+                n_job.pid = 0;
+                jobs[j] = n_job;
+            }
+        }
+    }
 }
 
 /*Main Routine*/
@@ -202,7 +237,7 @@ int main(void) {
     int bg;
     int out;
     int pip;
-
+    prep_jobs();
     while(1) {
         bg = 0;
         out = 0;
@@ -214,8 +249,8 @@ int main(void) {
         size_t linecap = 0;
         int length = 0;
         printf("%s", PROMPT);
-        
-        /*Add job management*/
+         
+       handle_completed_bg_job(); 
 
         length = getline(&line, &linecap, stdin);
         int cnt = get_cmd(args, &bg, &out, &pip, length, line);
