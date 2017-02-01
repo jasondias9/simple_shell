@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <setjmp.h>
 
 #define ARG_MAX 1024
 #define MAX_JOBS 10 
@@ -20,7 +21,8 @@ typedef struct job {
 } job;
 
 struct job jobs[MAX_JOBS];
-int fg_job; 
+int fg_job;
+sigjmp_buf intr_buf;
 
 /* Function Prototypes */
 int get_cmd(char *args[], int *background, int *out, int *pip, int length, char *line);
@@ -30,6 +32,12 @@ int merge_cmd(char **cmd, char *args[], int size);
 int slice_array(char *args[], char *args_c[], int start, int end);
 int execute_pipe(char *args[], int cnt);
 int check_exec_built_in(char *args[]);
+int add_job(pid_t pid, char * line);
+int list_jobs();
+int merge_cmd(char **cmd, char *args[], int size);
+int check_exec_built_in(char *args[]);
+int handle_completed_bg_job();
+void interrupt_handler(int signo);
 
 
 /* Parse and tokenize input from user */
@@ -155,6 +163,9 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
         } else if(pip) {
            execute_pipe(args, cnt);
         }
+        if(bg) {
+            signal(SIGINT, SIG_IGN);
+        }
         if(execvp(args[0], args) < 0) { 
             printf("jsh: command not found :  %s\n", args[0]);//assumumption
             exit(1);
@@ -208,10 +219,10 @@ int check_exec_built_in(char *args[]) {
     } else if(strcmp(args[0], "fg") == 0) {
         if(args[1]) {
             pid_t pid = jobs[atoi(args[1]) + 1].pid;
-            if(pid < 0) {
+            printf("%i", pid);
+            if(pid == 0) {
                 printf("fg: job not found: %s\n", args[1]);
             }
-            fg_job = pid;
             waitpid(pid, NULL, 0);
             fg_job = 0;
             return 1;
@@ -254,10 +265,11 @@ int handle_completed_bg_job() {
 
 void interrupt_handler(int signo) {
     if(fg_job != 0) {
-        printf("foreground");
-        kill(fg_job, SIGKILL);
+        kill(fg_job, SIGTERM);
+
     } else {
-        //somehow replicate a 'continue' in while loop.
+        printf("\n");
+        siglongjmp(intr_buf, 1);
     }
 }
 
@@ -271,7 +283,8 @@ int main(void) {
     if(signal(SIGINT, interrupt_handler) == SIG_ERR) {
       perror("somethign went wrong"); 
     }
-
+    
+    while(sigsetjmp(intr_buf, 1) != 0);
     while(1) {
         
         bg = 0;
@@ -287,6 +300,7 @@ int main(void) {
          
         handle_completed_bg_job(); 
         
+
         length = getline(&line, &linecap, stdin);
 
         //Avoid seg-fault on empty input
