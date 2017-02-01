@@ -20,6 +20,7 @@ typedef struct job {
 } job;
 
 struct job jobs[MAX_JOBS];
+int fg_job; 
 
 /* Function Prototypes */
 int get_cmd(char *args[], int *background, int *out, int *pip, int length, char *line);
@@ -40,7 +41,6 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
     if(length <= 0) {
         exit(-1);
     }
-
     if((loc = index(line, '&')) != NULL) {
         *background = 1;
         *loc = ' ';
@@ -61,6 +61,7 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
         pip = 0;
     }
     token = strtok(line, " \t\n");
+
     while(token != NULL) {
         for(int j = 0; j < strlen(token); j++) { 
             if(token[j] <= 32) token[j] = '\0'; 
@@ -120,6 +121,23 @@ int execute_pipe(char *args[], int cnt) {
     exit(1);
 }
 
+/* Add a background job to jobs */
+int add_job(pid_t pid, char * line) {
+    struct job n_job;
+    n_job.pid = pid; 
+    strcpy(n_job.cmd, line);
+    strcpy(n_job.state, "running"); //add additional states in the future
+    for(int i = 0; i < MAX_JOBS; i++) {
+        if(jobs[i].pid == 0) {
+            n_job.jid = i+1;  
+            jobs[i] = n_job;
+            BG_COUNT = i+1;
+            printf("[%i] %i\n", BG_COUNT, (int)pid);
+            break;
+        }
+    }
+}
+
 /* Execute the cmd and arguments */
 int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
     pid_t pid = fork();
@@ -145,15 +163,11 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
     }
     //Parent
     if(!bg) {
+        fg_job = pid;
         while(wait(&status) != pid);
+        fg_job = 0;
     } else {
-       struct job n_job;
-       n_job.pid = pid;
-       strcpy(n_job.cmd, line);
-       strcpy(n_job.state, "running");
-       n_job.jid = BG_COUNT+1;
-       jobs[BG_COUNT] = n_job;
-       BG_COUNT++;
+        add_job(pid, line);
     }
     return 0;
 }
@@ -192,25 +206,29 @@ int check_exec_built_in(char *args[]) {
     } else if(strcmp(args[0], "exit") == 0) {
         exit(0);
     } else if(strcmp(args[0], "fg") == 0) {
-        pid_t pid = jobs[atoi(args[1]) + 1].pid;
-        waitpid(pid, NULL, 0);
-        return 1;
+        if(args[1]) {
+            pid_t pid = jobs[atoi(args[1]) + 1].pid;
+            if(pid < 0) {
+                printf("fg: job not found: %s\n", args[1]);
+            }
+            fg_job = pid;
+            waitpid(pid, NULL, 0);
+            fg_job = 0;
+            return 1;
+        } else {
+            printf("fg: no current job\n");
+            return 1;
+        }
     } else if(strcmp(args[0], "jobs") == 0) { 
         list_jobs();
+        return 1;
+    } else if(strcmp(args[0], "clear") == 0) {
+        //the external clear cmd didnt always work. Did this for convenience.  
+        printf("\033[2J\033[1;1H"); 
         return 1;
     }
     return 0;
 }
-
-int prep_jobs() {
-    for(int i = 0; i < 10; i++) {
-        struct job n_job;
-        n_job.pid = 0;
-        jobs[i] = n_job;
-    }
-
-}
-
 
 int handle_completed_bg_job() {
     for(int j = 0; j < MAX_JOBS; j++) {
@@ -218,7 +236,10 @@ int handle_completed_bg_job() {
             int status;
             pid_t pid =  waitpid(jobs[j].pid, &status, WNOHANG);
             if(pid < 0) {
-              //empty list, no such process 
+                //process probably doesn't exist anymore
+                struct job n_job;
+                n_job.pid = 0;
+                jobs[j] = n_job;
             } else if(pid == 0) {
                 //do nothing, proc still running
                 
@@ -231,14 +252,28 @@ int handle_completed_bg_job() {
     }
 }
 
+void interrupt_handler(int signo) {
+    if(fg_job != 0) {
+        printf("foreground");
+        kill(fg_job, SIGKILL);
+    } else {
+        //somehow replicate a 'continue' in while loop.
+    }
+}
+
 /*Main Routine*/
 int main(void) { 
     char *args[20];
     int bg;
     int out;
     int pip;
-    prep_jobs();
+
+    if(signal(SIGINT, interrupt_handler) == SIG_ERR) {
+      perror("somethign went wrong"); 
+    }
+
     while(1) {
+        
         bg = 0;
         out = 0;
         pip = 0;
@@ -250,18 +285,26 @@ int main(void) {
         int length = 0;
         printf("%s", PROMPT);
          
-       handle_completed_bg_job(); 
-
+        handle_completed_bg_job(); 
+        
         length = getline(&line, &linecap, stdin);
+
+        //Avoid seg-fault on empty input
+        if (length == 1) {
+            continue;
+        }
+
         int cnt = get_cmd(args, &bg, &out, &pip, length, line);
         fflush(stdout);
         char *cmd;
+
         if(bg) {
             cmd = malloc(length);
             merge_cmd(&cmd, args, cnt);
         }
         
-        int ran = check_exec_built_in(args);
+        int ran = 0;
+        ran = check_exec_built_in(args);
         if(ran) continue;        
         else {
             execute(args, cnt, bg, out, pip, cmd);
