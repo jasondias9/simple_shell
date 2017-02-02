@@ -287,9 +287,12 @@ int main(void) {
     int pip;
 
     if(signal(SIGINT, interrupt_handler) == SIG_ERR) {
-      perror("somethign went wrong"); 
+      perror("something went wrong"); 
     }
-    
+   
+    if(signal(SIGTSTP, SIG_IGN) == SIG_ERR) {
+        perror("something went wrong");
+    }
     while(sigsetjmp(intr_buf, 1) != 0);
     while(1) {
         
@@ -304,13 +307,13 @@ int main(void) {
         int length = 0;
         printf("%s", PROMPT);
          
-        handle_completed_bg_job(); 
-        
+        handle_completed_bg_job();  
 
         length = getline(&line, &linecap, stdin);
 
         //Avoid seg-fault on empty input
         if (length == 1) {
+            free(line);
             continue;
         }
 
