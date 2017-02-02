@@ -1,4 +1,4 @@
-Simple Shell
+Simple Shell - JSH (~pronounced JSell)
 ============
 
 ## Features
@@ -10,7 +10,11 @@ Simple Shell
     * `exit` : exit the simple_shell
     * `jobs` : list jobs running in the background
 * Ability to run any external commands
-
+* Signal handling
+    * Interrupt (Ctrl-C) : Interrupt only foreground processes
+    * Suspend (Ctrl-Z) : Ignored by jsh
+* Output Redirection : Send the output of any external commend to disk
+* Piping : Redirect the output from one external command to the input of another
 
 
 ## Installation
