@@ -218,13 +218,19 @@ int check_exec_built_in(char *args[]) {
         exit(0);
     } else if(strcmp(args[0], "fg") == 0) {
         if(args[1]) {
-            pid_t pid = jobs[atoi(args[1]) + 1].pid;
-            printf("%i", pid);
-            if(pid == 0) {
-                printf("fg: job not found: %s\n", args[1]);
-            }
-            waitpid(pid, NULL, 0);
-            fg_job = 0;
+            for(int j = 0; j < BG_COUNT; j++) {
+                if(jobs[j].jid == atoi(args[1])) {
+                    pid_t pid = jobs[j].pid;
+                    if(pid == 0) {
+                        printf("fg: job not found: %s\n", args[1]);
+                    }
+                    fg_job = 1;
+                    //add some statement to stop ignoring signals for child process
+                    //add to a different process group?
+                    waitpid(pid, NULL, 0);
+                    fg_job = 0;
+                }
+            }  
             return 1;
         } else {
             printf("fg: no current job\n");
@@ -319,7 +325,11 @@ int main(void) {
         
         int ran = 0;
         ran = check_exec_built_in(args);
-        if(ran) continue;        
+        if(ran) {
+            free(line);
+            continue;
+        
+        }        
         else {
             execute(args, cnt, bg, out, pip, cmd);
             if(bg) {
