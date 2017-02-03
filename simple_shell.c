@@ -165,6 +165,7 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
            execute_pipe(args, cnt);
         }
         if(bg) {
+            //will prevent the process from being killed even if fg'd
             signal(SIGINT, SIG_IGN);
         }
         if(execvp(args[0], args) < 0) { 
@@ -263,8 +264,7 @@ int handle_completed_bg_job() {
                 n_job.pid = 0;
                 jobs[j] = n_job;
             } else if(pid == 0) {
-                //do nothing, proc still running
-                
+                //do nothing, proc still running     
             } else if(pid = jobs[j].pid) {
                 struct job n_job;
                 n_job.pid = 0;
@@ -278,7 +278,6 @@ int handle_completed_bg_job() {
 void interrupt_handler(int signo) {
     if(fg_job != 0) {
         kill(fg_job, SIGTERM);
-
     } else {
         printf("\n");
         siglongjmp(intr_buf, 1);
