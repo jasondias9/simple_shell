@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <setjmp.h>
 #include <ctype.h>
+
 #define ARG_MAX 1024
 #define MAX_JOBS 10 
 #define PROMPT "[jsh]>> "
@@ -285,6 +286,7 @@ void interrupt_handler(int signo) {
 }
 
 
+
 int is_empty(char *s) {
   while(isspace(*s)) {
     s++;
@@ -292,6 +294,8 @@ int is_empty(char *s) {
   return *s == '\0' ? 1 : 0;
 
 }
+
+
 
 /*Main Routine*/
 int main(void) { 
@@ -324,6 +328,7 @@ int main(void) {
         handle_completed_bg_job();  
 
         length = getline(&line, &linecap, stdin);
+
         //Avoid seg-fault on empty input
         if (is_empty(line)) {
             free(line);
