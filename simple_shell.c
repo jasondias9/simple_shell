@@ -73,6 +73,7 @@ int get_cmd(char *args[], int *background, int *out, int *pip, int length, char 
     while(token != NULL) {
         for(int j = 0; j < strlen(token); j++) { 
             if(token[j] <= 32) token[j] = '\0'; 
+            //find the index at which the second command in a pipe begins
             if(token[j] == 124) {
                 token[j] = '\0';
                 pip_i = i;
@@ -195,8 +196,7 @@ int list_jobs() {
 
 /* Generate actual command input from user without '&' */
 int merge_cmd(char **cmd, char *args[], int size) {
-    int i;
-    for(i = 0; i < size; i++){
+    for(int i = 0; i < size; i++){
         strcat(*cmd, args[i]);
         strcat(*cmd, " ");
     }
@@ -212,25 +212,26 @@ int check_exec_built_in(char *args[]) {
             return 1;
         }
     } else if(strcmp(args[0], "cd") == 0) {
-        chdir(args[1]);
+        if(chdir(args[1]) < 0) {
+            perror("cd");
+        }
         return 1;
     } else if(strcmp(args[0], "exit") == 0) {
         exit(0);
     } else if(strcmp(args[0], "fg") == 0) {
         if(args[1]) {
-            for(int j = 0; j < BG_COUNT; j++) {
+            for(int j = 0; j < MAX_JOBS; j++) {
                 if(jobs[j].jid == atoi(args[1])) {
                     pid_t pid = jobs[j].pid;
-                    if(pid == 0) {
-                        printf("fg: job not found: %s\n", args[1]);
-                    }
                     fg_job = 1;
                     //add some statement to stop ignoring signals for child process
                     //add to a different process group?
                     waitpid(pid, NULL, 0);
                     fg_job = 0;
+                    return 1;
                 }
-            }  
+            }
+            printf("fg: job not found: %s\n", args[1]);
             return 1;
         } else {
             printf("fg: no current job\n");
@@ -247,6 +248,7 @@ int check_exec_built_in(char *args[]) {
     return 0;
 }
 
+/* Called on every main loop iteration to check on jobs  */
 int handle_completed_bg_job() {
     for(int j = 0; j < MAX_JOBS; j++) {
         if(jobs[j].pid != 0) {
@@ -269,6 +271,7 @@ int handle_completed_bg_job() {
     }
 }
 
+/* Kill any foreground process  */
 void interrupt_handler(int signo) {
     if(fg_job != 0) {
         kill(fg_job, SIGTERM);
@@ -302,7 +305,7 @@ int main(void) {
         fflush(stdout); 
         memset(&args, 0, ARG_MAX);
 
-        char *line;
+        char *line = NULL;
         size_t linecap = 0;
         int length = 0;
         printf("%s", PROMPT);
