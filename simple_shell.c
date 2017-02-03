@@ -168,7 +168,8 @@ int execute(char *args[], int cnt, int bg, int out, int pip, char *line) {
             signal(SIGINT, SIG_IGN);
         }
         if(execvp(args[0], args) < 0) { 
-            printf("jsh: command not found :  %s\n", args[0]);//assumumption
+            //assumption that this is what went wrong
+            printf("jsh: command not found :  %s\n", args[0]);
             exit(1);
         } 
         fflush(stdout);
@@ -196,7 +197,9 @@ int list_jobs() {
 
 /* Generate actual command input from user without '&' */
 int merge_cmd(char **cmd, char *args[], int size) {
-    for(int i = 0; i < size; i++){
+    strcpy(*cmd, args[0]);
+    strcat(*cmd, " ");
+    for(int i = 1; i < size; i++){
         strcat(*cmd, args[i]);
         strcat(*cmd, " ");
     }
