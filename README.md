@@ -17,7 +17,7 @@ Simple Shell - JSH (~pronounced JSell)
 * Piping : Redirect the output from one external command to the input of another
 
 ## Limitations
-* Interrupt fails ob background process that have been foregrounded. This limitation
+* Interrupt fails on background process that have been foregrounded. This limitation
   exists since I chose to ignore SIGINT signals on background processes as signal 
   was being transmitted to the foreground as well as process in the same group 
   (background processes)
