@@ -1,4 +1,4 @@
-Simple Shell - JSH (~pronounced JSell)
+Simple Shell - JSH (~pronounced JShell)
 ============
 
 ## Features
